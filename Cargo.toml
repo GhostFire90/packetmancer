@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 iced = { version = "0.13.1"}
 rfd = "0.15.2"
+jzon = "0.12.5"

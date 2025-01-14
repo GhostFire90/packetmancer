@@ -14,6 +14,7 @@ fn view(state : &crate::state::State) -> Element<state::Message>{
 }
 
 fn main() -> iced::Result{
+
     iced::run("Test", update, view)
 }
 
