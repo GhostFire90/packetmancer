@@ -1,9 +1,9 @@
-use std::{fs::read_to_string, io::Write, ops::{Index, IndexMut}};
+use std::{fs::{read_to_string, File}, io::{Read, Write}, ops::{Index, IndexMut}};
 
 use iced::{widget::{button, row, text, text_input, Column}, Element};
 use rfd::FileDialog;
 
-use crate::packet::{PVMessage, PacketView};
+use crate::packet::{PVMessage, PacketView, PacketDataType};
 use std::net::TcpStream;
 
 
@@ -17,6 +17,7 @@ pub enum Message{
     Connect,
     Disconnect,
     SendPacket(usize),
+    RecievePacket(usize),
     OpenPacket
 }
 
@@ -25,8 +26,7 @@ pub struct State{
     packet_views : Vec<PacketView>,
     current_ip : String,
     current_port : String,
-    sock : Option<TcpStream>
-    
+    sock : Option<TcpStream>,
 }
 
 impl State{
@@ -49,6 +49,7 @@ impl State{
                 let obj = jzon::parse(&fstr).unwrap();
                 self.packet_views.push(PacketView::from(obj));
             }
+            Message::RecievePacket(x) => self.recieve(x).unwrap(),
             
         };
     }
@@ -62,6 +63,7 @@ impl State{
                 [
                     button("New Packet").on_press(Message::AddPacket).into(),
                     button("Open Packet").on_press(Message::OpenPacket).into(),
+                    
                 ]
             ).spacing(5)
         );
@@ -118,6 +120,54 @@ impl State{
         }
         Ok(())
     }
+
+    fn recieve(&mut self, p_idx : usize) -> std::io::Result<()>{
+        let packet = &mut self.packet_views[p_idx];
+        if let Some(s) = &mut self.sock{
+            for i in 0..packet.fields.len(){
+                match packet.fields[i].datatype.unwrap(){
+                    PacketDataType::Bytes(sizing_method) => {
+                        let fdiag = FileDialog::new()
+                        .add_filter("binary", &["bin",""])
+                        .save_file();
+                        if let Some(fpath) = fdiag{
+                            let mut f = File::create(fpath.clone())?;
+                            let mut rsize = 
+                                match sizing_method {
+                                    crate::packet::SizingMethod::SizeHeader(x) => packet.get_field(x).data_string.parse::<usize>().unwrap_or_default(),
+                                    crate::packet::SizingMethod::FixedSize(x) => x,
+                                };
+                            let mut dat = [0;4096];
+                            while rsize > 0{
+                                let count = s.read(&mut dat)?;
+                                println!("{count}");
+                                rsize -= count;
+                                f.write(&dat[0..count])?;
+                            }
+                        }
+                    },
+                    PacketDataType::CStr => {
+                        let mut dat : Vec<u8> = Vec::new();
+                        let mut c : [u8;1] = [0];
+                        while s.read(&mut c)? > 0 && c[0] != 0{
+                            dat.push(c[0]);
+                        }
+                        dat.push(0);
+                        packet.fields[i].data_string = std::ffi::CString::from_vec_with_nul(dat).unwrap().to_str().unwrap().to_string();
+                    },
+                    _ => {
+                        let dtype = packet.fields[i].datatype.unwrap();
+                        let mut dat : Vec<u8> = Vec::with_capacity(dtype.data_size());
+                        s.read(&mut dat)?;
+                        packet.fields[i].data_string = dtype.bytes_to_val(dat).as_ref().to_string();
+                    }
+                }
+            }
+        } 
+        Ok(())
+    }
+
+
 }
 
 impl Index<usize> for State{

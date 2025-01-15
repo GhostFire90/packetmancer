@@ -1,1 +1,19 @@
-{"index":0,"lable":"","fields":[{"index":0,"datatype":"CStr","data_string":"Hello World"},{"index":1,"datatype":"U8","data_string":"10"}]}
+{
+  "fields": [
+    {
+      "data_string": "Hello World",
+      "datatype": "CStr",
+      "index": 0,
+      "sizing_method": null
+    },
+    {
+      "data_string": "10",
+      "datatype": "U8",
+      "index": 1,
+      "sizing_method": null
+    }
+  ],
+  "index": 0,
+  "lable": "",
+  "recieve": false
+}
